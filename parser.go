@@ -36,7 +36,11 @@ func Parse(input io.Reader) (*IniFile, error) {
 
 // Err returns a parsing error
 func (p *iniParser) Err(text string) error {
-	return fmt.Errorf("%s line:%v, col:%v", text, p.lineNo, p.colNo)
+	return fmt.Errorf("%s (line:%v, col:%v)", text, p.lineNo, p.colNo)
+}
+
+func (p *iniParser) debug(msg string) {
+	// fmt.Printf("%s byte:%02x, node: %p, line: %p\n", msg, p.currentByte, p.currentNode, p.currentLine)
 }
 
 // parseEmpty expects to parse current token into an EmptyLine object
@@ -54,13 +58,15 @@ func (p *iniParser) parseEmptyLine(line *EmptyLine) error {
 			case Hash:
 				fallthrough
 			case SemiColon:
+				p.debug("starting comment")
 				// Save the padding (if any)
 				line.Padding = node 
 				// Start a new comment
-				p.currentNode = &CommentNode{ 
+				line.Comment = &CommentNode{ 
 					symbol: p.currentByte,
 					content: []byte{},
 				}
+				p.currentNode = line.Comment
 
 			case BracketOpen:
 				// Switch current line type to section line
@@ -87,13 +93,20 @@ func (p *iniParser) parseEmptyLine(line *EmptyLine) error {
 					p.currentLine = keyValueLine
 					p.currentNode = keyValueLine.Key
 				} else {
-					return p.Err("invalid character")
+					return p.Err(fmt.Sprintf("invalid character %02x for empty line",p.currentByte))
 				}
 			}
 		case *CommentNode:
 			// Anything goes in a comment ;)
+
+			p.debug("appending")
+			fmt.Printf("appending %02x\n", p.currentByte)
+			fmt.Printf("node: %p\n", node)
+			fmt.Printf("p.currentNode: %p\n", p.currentNode)
+
 			node.content = append(node.content, p.currentByte)
 	}
+	p.debug("leaving func")
 	return nil
 }
 
@@ -238,9 +251,11 @@ func (p *iniParser) advanceLine() {
 
 // parse consumes an io.Reader into a parsed IniFile
 func (p *iniParser) parse() (*IniFile, error) {
+	// TODO a line without a newline but EOF is not currently terminated
 
-	p.currentNode = &WhitespaceNode{}
-	p.currentLine = &EmptyLine{}
+	whiteSpace := &WhitespaceNode{} // we need the concrete type
+	p.currentNode = whiteSpace
+	p.currentLine = &EmptyLine{Padding: whiteSpace}
 
 	buf := make([]byte, 1) // slice of length 1
 	for {
@@ -258,6 +273,7 @@ func (p *iniParser) parse() (*IniFile, error) {
 		// Finish up current line and link up lines
 		if p.tokenType == NewLine {
 			p.advanceLine()
+			continue
 		}
 
 		switch line := p.currentLine.(type) {
