@@ -26,6 +26,10 @@ func TestParseEmptyFile(t *testing.T) {
 		assert.Nil(t, line)
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// EMPTY LINE CASES ////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
 // Test only a newline yields an empty line without nodes
 func TestParseEmptyLine(t *testing.T) {
 		file, err := testParse("\n")
@@ -77,26 +81,102 @@ func TestParseEmptyLineWhitespace(t *testing.T) {
 
 // Test only comment and a newline yields a comment node and empty whitespace node
 func TestParseEmptyLineComment(t *testing.T) {
-		file, err := testParse(string("# This is a	comment!\n"))
+	for _, symbol := range []byte{'#',';'} {
+		t.Run("symbol +" + string(symbol), func(t *testing.T) {
+			file, err := testParse(string(symbol) + " This is a	comment!\n")
 
-		assert.NoError(t, err)
-		assert.NotNil(t, file)
-		
-		line := file.Head
-		fmt.Printf("test line %p\n", line)
+			assert.NoError(t, err)
+			assert.NotNil(t, file)
+			
+			line := file.Head
+			fmt.Printf("test line %p\n", line)
 
-		assert.NotNil(t, line)
-		
-		concrete, ok := line.(*EmptyLine)
-		require.True(t, ok)
+			assert.NotNil(t, line)
+			
+			concrete, ok := line.(*EmptyLine)
+			require.True(t, ok)
 
-		assert.NotNil(t, concrete)
-		
-		whiteSpaceResult := concrete.Padding
-		commentResult := concrete.Comment
+			assert.NotNil(t, concrete)
+			
+			whiteSpaceResult := concrete.Padding
+			commentResult := concrete.Comment
 
-		assert.NotNil(t, whiteSpaceResult)
-		assert.NotNil(t, commentResult)
+			assert.NotNil(t, whiteSpaceResult)
+			assert.NotNil(t, commentResult)
 
-		assert.Equal(t, []byte(" This is a	comment!"), commentResult.content)
+			assert.Equal(t, symbol, commentResult.symbol)
+			assert.Equal(t, []byte(" This is a	comment!"), commentResult.content)
+		})
+	}
+}
+
+// Test a comment with some whitespace yields the whitespace and the comment node 
+func TestParseEmptyLineCommentAndPadding(t *testing.T) {
+	for _, symbol := range []byte{'#',';'} {
+		t.Run("symbol +" + string(symbol), func(t *testing.T) {
+			padding := []byte{
+				0x20, // space
+				0x09, // tab
+				0x0D, // carriage return
+			}
+			file, err := testParse(string(padding) + string(symbol) + " This is a	comment!\n")
+
+			assert.NoError(t, err)
+			assert.NotNil(t, file)
+			
+			line := file.Head
+			fmt.Printf("test line %p\n", line)
+
+			assert.NotNil(t, line)
+			
+			concrete, ok := line.(*EmptyLine)
+			require.True(t, ok)
+
+			assert.NotNil(t, concrete)
+			
+			whiteSpaceResult := concrete.Padding
+			commentResult := concrete.Comment
+
+			assert.NotNil(t, whiteSpaceResult)
+			assert.NotNil(t, commentResult)
+
+			assert.Equal(t, padding, whiteSpaceResult.content)
+
+			assert.Equal(t, symbol, commentResult.symbol)
+			assert.Equal(t, []byte(" This is a	comment!"), commentResult.content)
+		})
+	}
+}
+
+// Test a double comment still only yields one comment 
+func TestParseEmptyLineOnlyASingleComment(t *testing.T) {
+	for _, symbol := range []byte{'#',';'} {
+		strSymbol := string(symbol)
+		t.Run("symbol +" + strSymbol, func(t *testing.T) {
+			expected :=" This is a	" + strSymbol + "comment!" 
+			file, err := testParse(strSymbol + expected + "\n")
+
+			assert.NoError(t, err)
+			assert.NotNil(t, file)
+			
+			line := file.Head
+			fmt.Printf("test line %p\n", line)
+
+			assert.NotNil(t, line)
+			
+			concrete, ok := line.(*EmptyLine)
+			require.True(t, ok)
+
+			assert.NotNil(t, concrete)
+			
+			whiteSpaceResult := concrete.Padding
+			commentResult := concrete.Comment
+
+			assert.NotNil(t, whiteSpaceResult)
+			assert.NotNil(t, commentResult)
+
+			assert.Equal(t, symbol, commentResult.symbol)
+			assert.Equal(t, []byte(expected), commentResult.content)
+		})
+	}
 }
