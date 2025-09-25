@@ -194,7 +194,8 @@ func (p *iniParser) parseSectionHeaderLine(line *SectionHeaderLine) error {
 			switch p.tokenType {
 			case BracketClose:
 				// Transition to PostPad 
-				p.currentNode = &WhitespaceNode{}
+				line.PostPad = &WhitespaceNode{}
+				p.currentNode = line.PostPad
 			case Hash:
 				fallthrough
 			case SemiColon:
@@ -210,10 +211,12 @@ func (p *iniParser) parseSectionHeaderLine(line *SectionHeaderLine) error {
 				fallthrough
 			case SemiColon:
 				// Transition to comment
-				p.currentNode = &CommentNode{ 
+				line.Comment = &CommentNode{ 
 					symbol: p.currentByte,
 					content: []byte{},
 				}
+				p.currentNode = line.Comment
+
 			case Whitespace:
 				// Grow
 				node.content = append(node.content, p.currentByte)
