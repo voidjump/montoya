@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: Fuzz non-whitespace strings (comments, section names, etc.)
 // TODO: Test errors
 
 // testParse runs Parse with the input byte string, constructing a reader from it
@@ -299,8 +298,8 @@ func TestCommentedSectionYieldsEmptyLine(t *testing.T) {
 
 // Test that a simple key value line is parsed correctly
 func TestParseKeyValueLine(t *testing.T) {
-	key := "my_key"
-	value := "some value here"
+	key := fuzzKey()
+	value := fuzzValue(false)
 	file, err := testParse(key, B_EQUALS, value, B_NEWLINE)
 
 	assert.NoError(t, err)
@@ -322,15 +321,15 @@ func TestParseKeyValueLine(t *testing.T) {
 	assert.Nil(t, concrete.Comment)
 
 	assert.Len(t, concrete.Padding.content, 0)
-	assert.Equal(t, []byte(key), concrete.Key.content)
-	assert.Equal(t, []byte(value), concrete.Value.content)
+	assert.Equal(t, key, concrete.Key.content)
+	assert.Equal(t, value, concrete.Value.content)
 }
 
 // Test that a simple key value line with pre-key whitespace is parsed correctly
 func TestParseKeyValueLinePreWhitespace(t *testing.T) {
 	whitespace := fuzzWhiteSpace(10)
-	key := "my_key"
-	value := "some value here"
+	key := fuzzKey()
+	value := fuzzValue(false)
 	file, err := testParse(whitespace, key, B_EQUALS, value, B_NEWLINE)
 
 	assert.NoError(t, err)
@@ -351,15 +350,15 @@ func TestParseKeyValueLinePreWhitespace(t *testing.T) {
 	assert.Nil(t, concrete.Comment)
 
 	assert.Equal(t, whitespace, concrete.Padding.content)
-	assert.Equal(t, []byte(key), concrete.Key.content)
-	assert.Equal(t, []byte(value), concrete.Value.content)
+	assert.Equal(t, key, concrete.Key.content)
+	assert.Equal(t, value, concrete.Value.content)
 }
 
 // Test that post-Key whitespace is parsed correctly
 func TestParseKeyValueLinePostWhitespace(t *testing.T) {
 	whitespace := fuzzWhiteSpace(10)
-	key := "my_key"
-	value := "some value here"
+	key := fuzzKey()
+	value := fuzzValue(false)
 	file, err := testParse(key, whitespace, B_EQUALS, value, B_NEWLINE)
 
 	assert.NoError(t, err)
@@ -381,50 +380,16 @@ func TestParseKeyValueLinePostWhitespace(t *testing.T) {
 	assert.Nil(t, concrete.Comment)
 
 	assert.Len(t, concrete.Padding.content, 0)
-	assert.Equal(t, []byte(key), concrete.Key.content)
+	assert.Equal(t, key, concrete.Key.content)
 	assert.Len(t, whitespace, 10)
 	assert.Equal(t, whitespace, concrete.PostKeyPad.content)
-	assert.Equal(t, []byte(value), concrete.Value.content)
+	assert.Equal(t, value, concrete.Value.content)
 }
 
 // Test a key value line with a comment is parsed correctly
 func TestParseKeyValueComment(t *testing.T) {
 	whitespace := fuzzWhiteSpace(10)
-	key := "my_key"
-	value := "some value here"
-	comment := fuzzComment()
-	file, err := testParse(key, whitespace, B_EQUALS, value, comment, B_NEWLINE)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, file)
-
-	line := file.Head
-
-	assert.NotNil(t, line)
-
-	concrete, ok := line.(*KeyValueLine)
-	require.True(t, ok)
-
-	assert.NotNil(t, concrete)
-
-	assert.NotNil(t, concrete.Padding)
-	assert.NotNil(t, concrete.Key)
-	assert.NotNil(t, concrete.PostKeyPad)
-	assert.NotNil(t, concrete.Value)
-	assert.NotNil(t, concrete.Comment)
-
-	assert.Len(t, concrete.Padding.content, 0)
-	assert.Equal(t, []byte(key), concrete.Key.content)
-	assert.Equal(t, whitespace, concrete.PostKeyPad.content)
-	assert.Equal(t, []byte(value), concrete.Value.content)
-	assert.Equal(t, comment[1:], concrete.Comment.content)
-	assert.Equal(t, comment[0], concrete.Comment.symbol)
-}
-
-// Test a value can be inside a unquoted string
-func TestUnQuotedValue(t *testing.T) {
-	whitespace := fuzzWhiteSpace(10)
-	key := "my_key"
+	key := fuzzKey()
 	value := fuzzValue(false)
 	comment := fuzzComment()
 	file, err := testParse(key, whitespace, B_EQUALS, value, comment, B_NEWLINE)
@@ -448,7 +413,41 @@ func TestUnQuotedValue(t *testing.T) {
 	assert.NotNil(t, concrete.Comment)
 
 	assert.Len(t, concrete.Padding.content, 0)
-	assert.Equal(t, []byte(key), concrete.Key.content)
+	assert.Equal(t, key, concrete.Key.content)
+	assert.Equal(t, whitespace, concrete.PostKeyPad.content)
+	assert.Equal(t, value, concrete.Value.content)
+	assert.Equal(t, comment[1:], concrete.Comment.content)
+	assert.Equal(t, comment[0], concrete.Comment.symbol)
+}
+
+// Test a value can be inside a unquoted string
+func TestUnQuotedValue(t *testing.T) {
+	whitespace := fuzzWhiteSpace(10)
+	key := fuzzKey()
+	value := fuzzValue(false)
+	comment := fuzzComment()
+	file, err := testParse(key, whitespace, B_EQUALS, value, comment, B_NEWLINE)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, file)
+
+	line := file.Head
+
+	assert.NotNil(t, line)
+
+	concrete, ok := line.(*KeyValueLine)
+	require.True(t, ok)
+
+	assert.NotNil(t, concrete)
+
+	assert.NotNil(t, concrete.Padding)
+	assert.NotNil(t, concrete.Key)
+	assert.NotNil(t, concrete.PostKeyPad)
+	assert.NotNil(t, concrete.Value)
+	assert.NotNil(t, concrete.Comment)
+
+	assert.Len(t, concrete.Padding.content, 0)
+	assert.Equal(t, key, concrete.Key.content)
 	assert.Equal(t, whitespace, concrete.PostKeyPad.content)
 	assert.Equal(t, value, concrete.Value.content)
 	assert.Equal(t, comment[1:], concrete.Comment.content)
@@ -458,7 +457,7 @@ func TestUnQuotedValue(t *testing.T) {
 // Test a value can be inside a quoted string
 func TestQuotedValue(t *testing.T) {
 	whitespace := fuzzWhiteSpace(10)
-	key := "my_key"
+	key := fuzzKey()
 	value := fuzzValue(true)
 	comment := fuzzComment()
 	file, err := testParse(key, whitespace, B_EQUALS, value, comment, B_NEWLINE)
@@ -482,7 +481,7 @@ func TestQuotedValue(t *testing.T) {
 	assert.NotNil(t, concrete.Comment)
 
 	assert.Len(t, concrete.Padding.content, 0)
-	assert.Equal(t, []byte(key), concrete.Key.content)
+	assert.Equal(t, key, concrete.Key.content)
 	assert.Equal(t, whitespace, concrete.PostKeyPad.content)
 	assert.Equal(t, value, concrete.Value.content)
 	assert.Equal(t, comment[1:], concrete.Comment.content)

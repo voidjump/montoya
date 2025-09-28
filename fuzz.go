@@ -73,7 +73,7 @@ func fuzzValue(useQuotes bool) (value []byte) {
 	return
 }
 
-func FuzzKey() (key []byte) {
+func fuzzKey() (key []byte) {
 	for range 100 {
 		key = append(key, fuzzyChoice(validKeyByteSet))
 	}
