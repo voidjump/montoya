@@ -21,11 +21,11 @@ func fuzzWhiteSpace(numChars int) (whitespace []byte) {
 func fuzzComment() (comment []byte) {
 
 	comment = append(comment, fuzzyChoice(commentStartBytes))
-	n := rand.Intn(100) 
-	for i := 0; i < n ; i++{
+	n := rand.Intn(100)
+	for i := 0; i < n; i++ {
 		comment = append(comment, fuzzyChoice(validCommentByteSet))
 	}
-	return 
+	return
 }
 
 // fuzzSection creates a fuzzy section name
@@ -36,7 +36,7 @@ func fuzzSection(includeBrackets bool) (section []byte) {
 		section = append(section, B_BRACKET)
 	}
 
-	n := rand.Intn(100) 
+	n := rand.Intn(100)
 	for range n {
 		section = append(section, fuzzyChoice(validSectionByteSet))
 	}
@@ -52,10 +52,10 @@ func fuzzValue(useQuotes bool) (value []byte) {
 	if useQuotes {
 		value = append(value, B_QUOTE)
 	}
-	n := rand.Intn(100) 
+	n := rand.Intn(100)
 	for range n {
 		if useQuotes {
-			newByte := fuzzyChoice(validValueByteSetQuoted) 
+			newByte := fuzzyChoice(validValueByteSetQuoted)
 			if newByte == B_QUOTE {
 				value = append(value, B_BACKSLASH)
 				value = append(value, B_QUOTE)
@@ -71,4 +71,11 @@ func fuzzValue(useQuotes bool) (value []byte) {
 	}
 
 	return
+}
+
+func FuzzKey() (key []byte) {
+	for range 100 {
+		key = append(key, fuzzyChoice(validKeyByteSet))
+	}
+	return key
 }

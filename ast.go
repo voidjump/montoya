@@ -23,7 +23,7 @@ type IniNode interface {
 
 type LineBase struct {
 	ReadBuf []byte
-	reader io.Reader
+	reader  io.Reader
 
 	prev IniLine
 	next IniLine
@@ -39,29 +39,27 @@ func (l *LineBase) HasReader() bool {
 	return l.reader != nil
 }
 
-
-
-func (l *LineBase) Read(p []byte) (n int , err error) {
+func (l *LineBase) Read(p []byte) (n int, err error) {
 	if l.reader == nil {
 		l.reader = bytes.NewReader(l.ReadBuf)
 	}
 	return l.reader.Read(p)
 }
 
-func (l *LineBase) Next() IniLine{
+func (l *LineBase) Next() IniLine {
 	return l.next
 }
 
-func (l *LineBase) Previous() IniLine{
+func (l *LineBase) Previous() IniLine {
 	return l.prev
 }
 
 func (l *LineBase) SetPrev(node IniLine) {
-	l.prev = node 
+	l.prev = node
 }
 
 func (l *LineBase) SetNext(node IniLine) {
-	l.next = node 
+	l.next = node
 }
 
 type WhitespaceNode struct {
@@ -73,7 +71,7 @@ func (w *WhitespaceNode) Content() []byte {
 }
 
 type CommentNode struct {
-	symbol byte
+	symbol  byte
 	content []byte
 }
 
@@ -125,7 +123,7 @@ type SectionHeaderLine struct {
 	LineBase
 
 	Padding *WhitespaceNode
-	Header *HeaderNode
+	Header  *HeaderNode
 	PostPad *WhitespaceNode
 	Comment *CommentNode
 }
@@ -144,11 +142,11 @@ func (l *SectionHeaderLine) Read(p []byte) (n int, err error) {
 type KeyValueLine struct {
 	LineBase
 
-	Padding *WhitespaceNode
-	Key *KeyNode
+	Padding    *WhitespaceNode
+	Key        *KeyNode
 	PostKeyPad *WhitespaceNode
-	Value *ValueNode
-	Comment *CommentNode
+	Value      *ValueNode
+	Comment    *CommentNode
 }
 
 func (l *KeyValueLine) Read(p []byte) (n int, err error) {
@@ -157,7 +155,7 @@ func (l *KeyValueLine) Read(p []byte) (n int, err error) {
 		l.ReadBuf = append(l.ReadBuf, l.Padding.content...)
 		l.ReadBuf = append(l.ReadBuf, l.Key.content...)
 		l.ReadBuf = append(l.ReadBuf, l.PostKeyPad.content...)
-		l.ReadBuf = append(l.ReadBuf, B_EQUALS) // = 
+		l.ReadBuf = append(l.ReadBuf, B_EQUALS) // =
 		l.ReadBuf = append(l.ReadBuf, l.Value.content...)
 		l.ReadBuf = append(l.ReadBuf, l.Comment.content...)
 	}
@@ -166,25 +164,7 @@ func (l *KeyValueLine) Read(p []byte) (n int, err error) {
 
 // isKeyByte checks if the input may be present in a Key
 func isKeyByte(input byte) bool {
-	switch {
-	case input == B_BRACKET:
-		return false
-	case input == B_BRACKETCLOSE:
-		return false
-	case input <= B_US: // control characters (includes other whitespace)
-		return false
-	case input == B_SPACE:
-		return false
-	case input == B_EQUALS:
-		// The parse order should take care of this, but including it just to be sure
-		return false
-	default:
-		return true
-	}
-}
-
-func isValueByte(input byte) bool {
-	return input != B_NULL
+	return slices.Contains(validKeyByteSet, input)
 }
 
 // inQuotedString returns if `content` contains a currently unterminated quoted string
@@ -216,6 +196,7 @@ const VALUE_PARSE_QUOTED_TERMINATED = 4
 const VALUE_PARSE_UNQUOTED = 9
 const VALUE_PARSE_ERROR = 10
 
+// Use a state machine to determine the state of the currently parsed value string
 func valueStringState(content []byte) (state int) {
 	state = VALUE_PARSE_WHITESPACE
 	for _, token := range content {
@@ -223,20 +204,20 @@ func valueStringState(content []byte) (state int) {
 		// We are currently still parsing whitespace
 		case VALUE_PARSE_WHITESPACE:
 			switch convertToken(token) {
-				// Encounter another whitespace
-				case Whitespace:
-					continue
-				// The string opens
-				case Quote:
-					state = VALUE_PARSE_QUOTED
-				default:
-					// The string opens unquoted, check if the token is valid
-					if slices.Contains(validValueByteSetUnquoted, token) {
-						state = VALUE_PARSE_UNQUOTED
-					} else {
-						// this character is not allowed
-						return VALUE_PARSE_ERROR
-					}
+			// Encounter another whitespace
+			case Whitespace:
+				continue
+			// The string opens
+			case Quote:
+				state = VALUE_PARSE_QUOTED
+			default:
+				// The string opens unquoted, check if the token is valid
+				if slices.Contains(validValueByteSetUnquoted, token) {
+					state = VALUE_PARSE_UNQUOTED
+				} else {
+					// this character is not allowed
+					return VALUE_PARSE_ERROR
+				}
 			}
 
 		case VALUE_PARSE_QUOTED:
@@ -248,18 +229,17 @@ func valueStringState(content []byte) (state int) {
 			if token == B_QUOTE {
 				state = VALUE_PARSE_QUOTED_TERMINATED
 				break
-			} 
+			}
 			if slices.Contains(invalidValueByteSetQuoted, token) {
 				return VALUE_PARSE_ERROR
 			}
-		
+
 		case VALUE_PARSE_QUOTED_TERMINATED:
 			// Only allow whitespace after a quoted string terminates
 			if convertToken(token) != Whitespace {
 				return VALUE_PARSE_ERROR
 			}
-		
-	
+
 		case VALUE_PARSE_QUOTED_BACKSLASH:
 			// After a backslash basically anything is allowed except invalid bytes
 			if slices.Contains(invalidValueByteSetQuoted, token) {
@@ -267,7 +247,7 @@ func valueStringState(content []byte) (state int) {
 
 			}
 			state = VALUE_PARSE_QUOTED
-			
+
 		case VALUE_PARSE_UNQUOTED:
 			// Check for invalid bytes
 			if slices.Contains(invalidValueByteSetUnquoted, token) {
@@ -281,17 +261,16 @@ func valueStringState(content []byte) (state int) {
 	return
 }
 
-
 // isExtraQuoteLegal returns if `content` would still be legal after adding a quote
 //
 // This means concretely either:
 // The string is empty
-// The string has only whitespace 
+// The string has only whitespace
 // The string is a non-terminated quoted string
 // The last content character is an escaping backslash that is itself not escaped
 func isExtraQuoteLegal(content []byte) bool {
 	state := valueStringState(content)
-	return state != VALUE_PARSE_QUOTED_TERMINATED && 
-		   state != VALUE_PARSE_UNQUOTED &&
-		   state != VALUE_PARSE_ERROR
+	return state != VALUE_PARSE_QUOTED_TERMINATED &&
+		state != VALUE_PARSE_UNQUOTED &&
+		state != VALUE_PARSE_ERROR
 }

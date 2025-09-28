@@ -30,14 +30,13 @@ func testParse(input ...any) (*IniFile, error) {
 	return Parse(reader)
 }
 
-
 // Test an empty file yields no lines
 func TestParseEmptyFile(t *testing.T) {
 	file, err := testParse([]byte{})
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.Nil(t, line)
@@ -53,16 +52,16 @@ func TestParseEmptyLine(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*EmptyLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.Nil(t, concrete.Comment)
 	assert.Len(t, concrete.Padding.content, 0)
@@ -75,16 +74,16 @@ func TestParseEmptyLineWhitespace(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*EmptyLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.Nil(t, concrete.Comment)
 
@@ -99,16 +98,16 @@ func TestParseEmptyLineComment(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*EmptyLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Comment)
 
@@ -116,7 +115,7 @@ func TestParseEmptyLineComment(t *testing.T) {
 	assert.Equal(t, comment[1:], concrete.Comment.content)
 }
 
-// Test a comment with some whitespace yields the whitespace and the comment node 
+// Test a comment with some whitespace yields the whitespace and the comment node
 func TestParseEmptyLineCommentAndPadding(t *testing.T) {
 	padding := fuzzWhiteSpace(20)
 	comment := fuzzComment()
@@ -124,16 +123,16 @@ func TestParseEmptyLineCommentAndPadding(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*EmptyLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Comment)
 
@@ -143,18 +142,18 @@ func TestParseEmptyLineCommentAndPadding(t *testing.T) {
 	assert.Equal(t, comment[1:], concrete.Comment.content)
 }
 
-// Test a double comment still only yields one comment 
+// Test a double comment still only yields one comment
 func TestParseEmptyLineOnlyASingleComment(t *testing.T) {
 	comment := string(fuzzComment()) + string(fuzzComment())
 	file, err := testParse(comment, B_NEWLINE)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*EmptyLine)
 	require.True(t, ok)
 
@@ -178,16 +177,16 @@ func TestParseSimpleSectionNoPadding(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*SectionHeaderLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Header)
 	assert.NotNil(t, concrete.PostPad)
@@ -198,26 +197,25 @@ func TestParseSimpleSectionNoPadding(t *testing.T) {
 	assert.Equal(t, section, concrete.Header.content)
 }
 
-
 // Test a section header and pre-header padding yields the section and the whitespace node, and empty Postpad
 func TestParseSimpleSectionWithPadding(t *testing.T) {
-	padding := fuzzWhiteSpace(20) 
+	padding := fuzzWhiteSpace(20)
 	section := fuzzSection(false)
 
 	file, err := testParse(padding, B_BRACKET, section, B_BRACKETCLOSE, B_NEWLINE)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*SectionHeaderLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Header)
 	assert.NotNil(t, concrete.PostPad)
@@ -238,16 +236,16 @@ func TestParseSimpleSectionWithPaddingAndPostPad(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*SectionHeaderLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Header)
 	assert.NotNil(t, concrete.PostPad)
@@ -268,16 +266,16 @@ func TestParseSimpleSectionWithWhitespaceAndComment(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*SectionHeaderLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Header)
 	assert.NotNil(t, concrete.PostPad)
@@ -307,22 +305,21 @@ func TestParseKeyValueLine(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*KeyValueLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Key)
 	assert.NotNil(t, concrete.Value)
 	assert.Nil(t, concrete.PostKeyPad)
 	assert.Nil(t, concrete.Comment)
-
 
 	assert.Len(t, concrete.Padding.content, 0)
 	assert.Equal(t, []byte(key), concrete.Key.content)
@@ -338,21 +335,20 @@ func TestParseKeyValueLinePreWhitespace(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*KeyValueLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Key)
 	assert.NotNil(t, concrete.Value)
 	assert.Nil(t, concrete.Comment)
-
 
 	assert.Equal(t, whitespace, concrete.Padding.content)
 	assert.Equal(t, []byte(key), concrete.Key.content)
@@ -368,22 +364,21 @@ func TestParseKeyValueLinePostWhitespace(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*KeyValueLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Key)
 	assert.NotNil(t, concrete.PostKeyPad)
 	assert.NotNil(t, concrete.Value)
 	assert.Nil(t, concrete.Comment)
-
 
 	assert.Len(t, concrete.Padding.content, 0)
 	assert.Equal(t, []byte(key), concrete.Key.content)
@@ -397,27 +392,26 @@ func TestParseKeyValueComment(t *testing.T) {
 	whitespace := fuzzWhiteSpace(10)
 	key := "my_key"
 	value := "some value here"
-	comment := fuzzComment() 
+	comment := fuzzComment()
 	file, err := testParse(key, whitespace, B_EQUALS, value, comment, B_NEWLINE)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*KeyValueLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Key)
 	assert.NotNil(t, concrete.PostKeyPad)
 	assert.NotNil(t, concrete.Value)
 	assert.NotNil(t, concrete.Comment)
-
 
 	assert.Len(t, concrete.Padding.content, 0)
 	assert.Equal(t, []byte(key), concrete.Key.content)
@@ -432,27 +426,26 @@ func TestUnQuotedValue(t *testing.T) {
 	whitespace := fuzzWhiteSpace(10)
 	key := "my_key"
 	value := fuzzValue(false)
-	comment := fuzzComment() 
+	comment := fuzzComment()
 	file, err := testParse(key, whitespace, B_EQUALS, value, comment, B_NEWLINE)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*KeyValueLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Key)
 	assert.NotNil(t, concrete.PostKeyPad)
 	assert.NotNil(t, concrete.Value)
 	assert.NotNil(t, concrete.Comment)
-
 
 	assert.Len(t, concrete.Padding.content, 0)
 	assert.Equal(t, []byte(key), concrete.Key.content)
@@ -462,33 +455,31 @@ func TestUnQuotedValue(t *testing.T) {
 	assert.Equal(t, comment[0], concrete.Comment.symbol)
 }
 
-
 // Test a value can be inside a quoted string
 func TestQuotedValue(t *testing.T) {
 	whitespace := fuzzWhiteSpace(10)
 	key := "my_key"
 	value := fuzzValue(true)
-	comment := fuzzComment() 
+	comment := fuzzComment()
 	file, err := testParse(key, whitespace, B_EQUALS, value, comment, B_NEWLINE)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, file)
-	
+
 	line := file.Head
 
 	assert.NotNil(t, line)
-	
+
 	concrete, ok := line.(*KeyValueLine)
 	require.True(t, ok)
 
 	assert.NotNil(t, concrete)
-	
+
 	assert.NotNil(t, concrete.Padding)
 	assert.NotNil(t, concrete.Key)
 	assert.NotNil(t, concrete.PostKeyPad)
 	assert.NotNil(t, concrete.Value)
 	assert.NotNil(t, concrete.Comment)
-
 
 	assert.Len(t, concrete.Padding.content, 0)
 	assert.Equal(t, []byte(key), concrete.Key.content)
