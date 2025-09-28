@@ -12,7 +12,7 @@ import (
 func TestSpecifiedTokens(t *testing.T) {
 
 	file := []byte {
-		0x0A, 0x5B, 0x5D, 0x3D, 0x23, 0x3B, 0x22, 0x20, 0x09, 0x0D,
+		B_NEWLINE, B_BRACKET, B_BRACKETCLOSE, B_EQUALS, B_HASH, B_SEMICOLON, B_QUOTE, B_SPACE, B_TAB, B_CR,
 	}
 
 	reader := bytes.NewReader(file)
@@ -23,43 +23,43 @@ func TestSpecifiedTokens(t *testing.T) {
 
 	expected := []Token{
 		{
-			Content:0x0A,
+			Content:B_NEWLINE,
 			Kind:NewLine,
 		},
 		{
-			Content:0x5B,
-			Kind:BracketOpen,
+			Content:B_BRACKET,
+			Kind:SectionStart,
 		},
 		{
-			Content:0x5D,
-			Kind:BracketClose,
+			Content:B_BRACKETCLOSE,
+			Kind:SectionEnd,
 		},
 		{
-			Content:0x3D,
+			Content:B_EQUALS,
 			Kind:Equals,
 		},
 		{
-			Content:0x23,
-			Kind:Hash,
+			Content:B_HASH,
+			Kind:CommentStart,
 		},
 		{
-			Content:0x3B,
-			Kind:SemiColon,
+			Content:B_SEMICOLON,
+			Kind:CommentStart,
 		},
 		{
-			Content:0x22,
+			Content:B_QUOTE,
 			Kind:Quote,
 		},
 		{
-			Content:0x20,
+			Content:B_SPACE,
 			Kind:Whitespace,
 		},
 		{
-			Content:0x09,
+			Content:B_TAB,
 			Kind:Whitespace,
 		},
 		{
-			Content:0x0D,
+			Content:B_CR,
 			Kind:Whitespace,
 		},
 	}
@@ -71,10 +71,10 @@ func TestSpecifiedTokens(t *testing.T) {
 // Check that all Unspecified tokens are tokenized as type 'Other'
 func TestOtherTokens(t *testing.T) {
 	specified := []byte {
-		0x0A, 0x5B, 0x5D, 0x3D, 0x23, 0x3B, 0x22, 0x20, 0x09, 0x0D,
+		B_NEWLINE, B_BRACKET, B_BRACKETCLOSE, B_EQUALS, B_HASH, B_SEMICOLON, B_QUOTE, B_SPACE, B_TAB, B_CR,
 	}
 
-	for rawByte := 0x00; rawByte < 0xff; rawByte++ {
+	for rawByte := 0x00; rawByte < 256; rawByte++ {
 		castByte := byte(rawByte)
 		// do something with x
 		if slices.Contains(specified, castByte) {

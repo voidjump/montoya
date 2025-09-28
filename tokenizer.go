@@ -8,13 +8,12 @@ import (
 type TokenType int
 
 const (
-	Whitespace = iota //
-	BracketOpen // [
-	BracketClose // ]
+	Whitespace = iota // tab, space or carriage return
+	CommentStart // # or ;
+	SectionStart // [
+	SectionEnd // ]
 	NewLine // \n
 	Equals // =
-	SemiColon // ;
-	Hash // #
 	Quote // "
 	Other // ?
 )
@@ -27,24 +26,23 @@ type Token struct {
 // convert tokensj
 func convertToken(rawByte byte) TokenType {
 	switch rawByte {
-	case 0x0A: 
+	case B_NEWLINE: 
 		return NewLine
-	case 0x5B:
-		return BracketOpen
-	case 0x5D:
-		return BracketClose
-	case 0x3D:
+	case B_BRACKET:
+		return SectionStart
+	case B_BRACKETCLOSE:
+		return SectionEnd
+	case B_EQUALS:
 		return Equals
-	case 0x23:
-		return Hash
-	case 0x3B:
-		return SemiColon
-	case 0x22:
+	case B_SEMICOLON,
+		 B_HASH:
+		return CommentStart 
+	case B_QUOTE:
 		return Quote
 	// Whitespace cases
-	case 0x20, // space
-		0x09, // tab
-		0x0D: // carriage return
+	case B_SPACE, // space
+		 B_TAB, // tab
+	 	 B_CR: // carriage return
 		return Whitespace
 	default:
 		return Other

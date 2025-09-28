@@ -55,9 +55,7 @@ func (p *iniParser) parseEmptyLine(line *EmptyLine) error {
 			case Whitespace:
 				// Grow the whitespace
 				node.content = append(node.content, p.currentByte)
-			case Hash:
-				fallthrough
-			case SemiColon:
+			case CommentStart:
 				p.debug("starting comment")
 				// Save the padding (if any)
 				line.Padding = node 
@@ -68,7 +66,7 @@ func (p *iniParser) parseEmptyLine(line *EmptyLine) error {
 				}
 				p.currentNode = line.Comment
 
-			case BracketOpen:
+			case SectionStart:
 				// Switch current line type to section line
 				headerLine := &SectionHeaderLine{
 					// Preserve padding, if any
@@ -113,37 +111,59 @@ func (p *iniParser) parseEmptyLine(line *EmptyLine) error {
 // parseKeyValueLine expects to parse current token into a KeyValueLine object
 // 
 // A KeyValueLine looks like this:
-// <Whitespace (optional)><Key>[=]<SectionHeader><Comment (optional>[\n]
+// <Whitespace (optional)><Key>[=]<Value><Comment (optional>[\n]
 //
-// Since the Parser prioritizes an EmptyLine first, Padding is never parsed in
-// this function
+// Since the Parser prioritizes an EmptyLine first, initial Padding is never parsed here
 func (p *iniParser) parseKeyValueLine(line *KeyValueLine) error {
 	switch node := p.currentNode.(type) {
 				case *KeyNode:
 					if p.tokenType == Equals {
 						// Transition to value
-						p.currentNode = &ValueNode{}
+						line.Value = &ValueNode{}
+						p.currentNode = line.Value 
+						break
+					}
+					if p.tokenType == Whitespace {
+						// Transition to PostKeyPad
+						line.PostKeyPad = &WhitespaceNode{content: []byte{p.currentByte}}
+						p.currentNode = line.PostKeyPad
 						break
 					}
 					if isKeyByte(p.currentByte) {
 						// Grow key
 						node.content = append(node.content, p.currentByte)
 					} else {
-						return p.Err("invalid character in key") 
+						return p.Err(fmt.Sprintf("invalid character %02x in key", p.currentByte)) 
 					}
+				// This must be post-key whitespace
+				case *WhitespaceNode:
+					if p.tokenType == Equals {
+						// Transition to value
+						line.Value = &ValueNode{}
+						p.currentNode = line.Value 
+						break
+					}
+					if p.tokenType == Whitespace {
+						// Grow
+						node.content = append(node.content, p.currentByte)
+						break
+					}
+					return p.Err(fmt.Sprintf("invalid non-whitespace character %02x in key", p.currentByte)) 
+
 				case *ValueNode:
 					// If we encounter a comment symbol transfer to comment node
-					if (p.tokenType == Hash || p.tokenType == SemiColon) {
+					if (p.tokenType == CommentStart) {
 						// Check if we are in a quoted string
 						if inQuotedString(node.content) {
 							// simply append
 							node.content = append(node.content, p.currentByte)
 						} else{
 							// Start a new comment
-							p.currentNode = &CommentNode{ 
+							line.Comment = &CommentNode{ 
 								symbol: p.currentByte,
 								content: []byte{},
 							}
+							p.currentNode = line.Comment
 						}
 						break
 					}
@@ -162,12 +182,12 @@ func (p *iniParser) parseKeyValueLine(line *KeyValueLine) error {
 					}
 					if isValueByte(p.currentByte) {
 						if isClosedQuotedString(node.content) {
-							return p.Err("illegal character after terminated quoted value")
+							return p.Err(fmt.Sprintf("illegal character %02x after terminated quoted value",p.currentByte))
 						}
 						node.content = append(node.content, p.currentByte)
 						break
 					} else {
-						return p.Err("illegal character in value")
+						return p.Err(fmt.Sprintf("illegal character %02x in value", p.currentByte))
 					}
 				case *CommentNode:
 					// Anything goes in a comment ;)
@@ -192,13 +212,11 @@ func (p *iniParser) parseSectionHeaderLine(line *SectionHeaderLine) error {
 			node.content = append(node.content, p.currentByte)
 		case *HeaderNode:
 			switch p.tokenType {
-			case BracketClose:
+			case SectionEnd:
 				// Transition to PostPad 
 				line.PostPad = &WhitespaceNode{}
 				p.currentNode = line.PostPad
-			case Hash:
-				fallthrough
-			case SemiColon:
+			case CommentStart:
 				return p.Err("illegal comment start in bracket")
 			default:
 				// Grow the header content
@@ -207,9 +225,7 @@ func (p *iniParser) parseSectionHeaderLine(line *SectionHeaderLine) error {
 		case *WhitespaceNode:
 			// This must be the PostPad
 			switch p.tokenType {
-			case Hash:
-				fallthrough
-			case SemiColon:
+			case CommentStart:
 				// Transition to comment
 				line.Comment = &CommentNode{ 
 					symbol: p.currentByte,
@@ -221,7 +237,7 @@ func (p *iniParser) parseSectionHeaderLine(line *SectionHeaderLine) error {
 				// Grow
 				node.content = append(node.content, p.currentByte)
 			default:
-				return p.Err("illegal non-comment character after closed section header")
+				return p.Err(fmt.Sprintf("illegal non-comment character %02x after closed section header",p.currentByte))
 			}
 		
 	}

@@ -3,6 +3,7 @@ package montoya
 import (
 	"bytes"
 	"io"
+	"slices"
 )
 
 // An IniLine is any line type in an Inifile
@@ -145,6 +146,7 @@ type KeyValueLine struct {
 
 	Padding *WhitespaceNode
 	Key *KeyNode
+	PostKeyPad *WhitespaceNode
 	Value *ValueNode
 	Comment *CommentNode
 }
@@ -154,6 +156,8 @@ func (l *KeyValueLine) Read(p []byte) (n int, err error) {
 		// Populate buffer
 		l.ReadBuf = append(l.ReadBuf, l.Padding.content...)
 		l.ReadBuf = append(l.ReadBuf, l.Key.content...)
+		l.ReadBuf = append(l.ReadBuf, l.PostKeyPad.content...)
+		l.ReadBuf = append(l.ReadBuf, B_EQUALS) // = 
 		l.ReadBuf = append(l.ReadBuf, l.Value.content...)
 		l.ReadBuf = append(l.ReadBuf, l.Comment.content...)
 	}
@@ -163,11 +167,16 @@ func (l *KeyValueLine) Read(p []byte) (n int, err error) {
 // isKeyByte checks if the input may be present in a Key
 func isKeyByte(input byte) bool {
 	switch {
-	case input == '[':
+	case input == B_BRACKET:
 		return false
-	case input == ']':
+	case input == B_BRACKETCLOSE:
 		return false
-	case input <= 0x1F: // control characters
+	case input <= B_US: // control characters (includes other whitespace)
+		return false
+	case input == B_SPACE:
+		return false
+	case input == B_EQUALS:
+		// The parse order should take care of this, but including it just to be sure
 		return false
 	default:
 		return true
@@ -175,81 +184,19 @@ func isKeyByte(input byte) bool {
 }
 
 func isValueByte(input byte) bool {
-	return input != 0x00
+	return input != B_NULL
 }
 
 // inQuotedString returns if `content` contains a currently unterminated quoted string
 func inQuotedString(content []byte) bool {
-	whitespace := true
-	inString := false
-	escape := false
-	for _, contentByte := range content {
-		// skip al initial whitespace
-		if whitespace {
-			if TokenType(contentByte) != Whitespace {
-				whitespace = false
-			}
-			continue
-		}
-		// Only continue if the first non-whitespace character is a "
-		if !inString {
-			if contentByte == '"' {
-				inString = true
-				continue
-			}
-			return false
-		}
-		if !escape {
-			if contentByte == '\\' {
-				escape = true
-				continue
-			}
-			if contentByte == '"' {
-				return false
-			}
-			continue
-		} 		
-		// this character is escaped, and then we look at the next
-		escape = false
-	}
-	return true 
+	state := valueStringState(content)
+	return state == VALUE_PARSE_QUOTED || state == VALUE_PARSE_QUOTED_BACKSLASH
 }
 
 // isClosedQuotedString returns if `content` contains a quoted string that has been closed
 func isClosedQuotedString(content []byte) bool {
-	whitespace := true
-	inString := false
-	escape := false
-	for _, contentByte := range content {
-		// skip al initial whitespace
-		if whitespace {
-			if TokenType(contentByte) != Whitespace {
-				whitespace = false
-			}
-			continue
-		}
-		// Only continue if the first non-whitespace character is a "
-		if !inString {
-			if contentByte == '"' {
-				inString = true
-				continue
-			}
-			return false
-		}
-		if !escape {
-			if contentByte == '\\' {
-				escape = true
-				continue
-			}
-			if contentByte == '"' {
-				return true 
-			}
-			continue
-		} 		
-		// this character is escaped, and then we look at the next
-		escape = false
-	}
-	return false 
+	state := valueStringState(content)
+	return state == VALUE_PARSE_QUOTED_TERMINATED
 }
 
 // Check if all of content is whitespace
@@ -262,6 +209,79 @@ func allWhiteSpace(content []byte) bool {
 	return true
 }
 
+const VALUE_PARSE_WHITESPACE = 1
+const VALUE_PARSE_QUOTED = 2
+const VALUE_PARSE_QUOTED_BACKSLASH = 3
+const VALUE_PARSE_QUOTED_TERMINATED = 4
+const VALUE_PARSE_UNQUOTED = 9
+const VALUE_PARSE_ERROR = 10
+
+func valueStringState(content []byte) (state int) {
+	state = VALUE_PARSE_WHITESPACE
+	for _, token := range content {
+		switch state {
+		// We are currently still parsing whitespace
+		case VALUE_PARSE_WHITESPACE:
+			switch convertToken(token) {
+				// Encounter another whitespace
+				case Whitespace:
+					continue
+				// The string opens
+				case Quote:
+					state = VALUE_PARSE_QUOTED
+				default:
+					// The string opens unquoted, check if the token is valid
+					if slices.Contains(validValueByteSetUnquoted, token) {
+						state = VALUE_PARSE_UNQUOTED
+					} else {
+						// this character is not allowed
+						return VALUE_PARSE_ERROR
+					}
+			}
+
+		case VALUE_PARSE_QUOTED:
+			// Start escaping on a backslash, terminate on a quote
+			if token == B_BACKSLASH {
+				state = VALUE_PARSE_QUOTED_BACKSLASH
+				break
+			}
+			if token == B_QUOTE {
+				state = VALUE_PARSE_QUOTED_TERMINATED
+				break
+			} 
+			if slices.Contains(invalidValueByteSetQuoted, token) {
+				return VALUE_PARSE_ERROR
+			}
+		
+		case VALUE_PARSE_QUOTED_TERMINATED:
+			// Only allow whitespace after a quoted string terminates
+			if convertToken(token) != Whitespace {
+				return VALUE_PARSE_ERROR
+			}
+		
+	
+		case VALUE_PARSE_QUOTED_BACKSLASH:
+			// After a backslash basically anything is allowed except invalid bytes
+			if slices.Contains(invalidValueByteSetQuoted, token) {
+				return VALUE_PARSE_ERROR
+
+			}
+			state = VALUE_PARSE_QUOTED
+			
+		case VALUE_PARSE_UNQUOTED:
+			// Check for invalid bytes
+			if slices.Contains(invalidValueByteSetUnquoted, token) {
+				return VALUE_PARSE_ERROR
+			}
+		default:
+			panic("unknown state")
+		}
+
+	}
+	return
+}
+
+
 // isExtraQuoteLegal returns if `content` would still be legal after adding a quote
 //
 // This means concretely either:
@@ -270,22 +290,8 @@ func allWhiteSpace(content []byte) bool {
 // The string is a non-terminated quoted string
 // The last content character is an escaping backslash that is itself not escaped
 func isExtraQuoteLegal(content []byte) bool {
-	if len(content) == 0 {
-		return true
-	}
-	if allWhiteSpace(content) {
-		return true
-	}
-	if inQuotedString(content) {
-		return true
-	}
-
-	// check if content ends with unescaped backslash
-	i := len(content) - 1
-    count := 0
-    for i >= 0 && content[i] == '\\' {
-        count++
-        i--
-    }
-	return count % 2 == 1 
+	state := valueStringState(content)
+	return state != VALUE_PARSE_QUOTED_TERMINATED && 
+		   state != VALUE_PARSE_UNQUOTED &&
+		   state != VALUE_PARSE_ERROR
 }
