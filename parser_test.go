@@ -9,6 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO: Add unit tests for Terminate cases
+// TODO: Fuzz test, tests sometimes failing
+
 // testParse runs Parse with the input byte string, constructing a reader from it
 func testParse(input ...any) (*IniFile, error) {
 	var buf bytes.Buffer
