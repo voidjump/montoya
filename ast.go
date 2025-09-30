@@ -9,11 +9,18 @@ import (
 // An IniLine is any line type in an Inifile
 type IniLine interface {
 	io.Reader
+	// Reset resets the reader state so the line may be re-read
 	Reset()
+	// Terminated tests if all nodes on the line were properly terminated
+	Terminated() bool
+	// Next yields the next line
 	Next() IniLine
+	// Next yields the previous line
 	Previous() IniLine
-	SetPrev(node IniLine)
+	// SetNext sets the next line
 	SetNext(node IniLine)
+	// SetPrev sets the previous line
+	SetPrev(node IniLine)
 }
 
 // An IniNode is part of an IniLine
@@ -147,6 +154,11 @@ func (l *EmptyLine) Read(p []byte) (n int, err error) {
 	return l.LineBase.Read(p)
 }
 
+// Terminated is always true for an EmptyLine
+func (l *EmptyLine) Terminated() bool {
+	return true
+}
+
 // Section is an iniLine containing a section header and optional comment
 type SectionHeaderLine struct {
 	LineBase
@@ -167,6 +179,12 @@ func (l *SectionHeaderLine) Read(p []byte) (n int, err error) {
 		l.ReadBuf = append(l.ReadBuf, l.Comment.content...)
 	}
 	return l.LineBase.Read(p)
+}
+
+// Terminated indicates whether a SectionHeaderLine was properly terminated 
+func (l *SectionHeaderLine) Terminated() bool {
+	// the parser adds a PostPad node when the section header terminates
+	return l.PostPad != nil
 }
 
 // KeyValueLine is an iniLine containing a key, value and optional comment
@@ -192,6 +210,17 @@ func (l *KeyValueLine) Read(p []byte) (n int, err error) {
 		l.ReadBuf = append(l.ReadBuf, l.Comment.content...)
 	}
 	return l.LineBase.Read(p)
+}
+
+// Terminated indicates whether a KeyValueLine was properly terminated 
+func (l *KeyValueLine) Terminated() bool {
+	if l.Value == nil {
+		// parser never saw B_EQUALS
+		return false
+	}	
+
+	state := valueStringState(l.Value.content) 
+	return (state == VALUE_PARSE_WHITESPACE || state ==  VALUE_PARSE_QUOTED_TERMINATED || state == VALUE_PARSE_UNQUOTED)
 }
 
 // isKeyByte checks if the input may be present in a Key

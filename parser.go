@@ -1,6 +1,7 @@
 package montoya
 
 import (
+	"errors"
 	"fmt"
 	"io"
 )
@@ -242,9 +243,15 @@ func (p *iniParser) parseSectionHeaderLine(line *SectionHeaderLine) error {
 //
 // The line is linked up to the previous line if it exists to create a linked list
 // The new line is started as an `EmptyLine`` with a `WhitespaceNode`
-func (p *iniParser) advanceLine() {
+func (p *iniParser) advanceLine() error {
+	
+	if p.currentLine == nil {
+		return errors.New("parser cannot advance on a non-nil line") 
+	}
+	if !p.currentLine.Terminated() {
+		return errors.New("the current line was not properly terminated")
+	}
 
-	// TODO: We should check if nodes on the line are properly terminated
 	if p.previousLine != nil {
 		p.previousLine.SetNext(p.currentLine)
 		p.currentLine.SetPrev(p.previousLine)
@@ -264,6 +271,7 @@ func (p *iniParser) advanceLine() {
 	p.lineNo += 1
 	p.colNo = 0
 
+	return nil
 }
 
 // parse consumes an io.Reader into a parsed IniFile
@@ -289,7 +297,10 @@ func (p *iniParser) parse() (*IniFile, error) {
 
 		// Finish up current line and link up lines
 		if p.tokenType == NewLine {
-			p.advanceLine()
+			err := p.advanceLine()
+			if err != nil {
+				return nil, fmt.Errorf("cannot advance to next line: %w", err)
+			}
 			continue
 		}
 
