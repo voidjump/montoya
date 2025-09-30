@@ -39,6 +39,7 @@ func (p *iniParser) Err(text string) error {
 	return fmt.Errorf("%s (line:%v, col:%v)", text, p.lineNo, p.colNo)
 }
 
+// debug prints out the message together with some parser state
 func (p *iniParser) debug(msg string) {
 	// fmt.Printf("%s byte:%02x, node: %p, line: %p\n", msg, p.currentByte, p.currentNode, p.currentLine)
 }
@@ -97,13 +98,8 @@ func (p *iniParser) parseEmptyLine(line *EmptyLine) error {
 		// Anything goes in a comment ;)
 
 		p.debug("appending")
-		fmt.Printf("appending %02x\n", p.currentByte)
-		fmt.Printf("node: %p\n", node)
-		fmt.Printf("p.currentNode: %p\n", p.currentNode)
-
 		node.content = append(node.content, p.currentByte)
 	}
-	p.debug("leaving func")
 	return nil
 }
 
@@ -242,6 +238,10 @@ func (p *iniParser) parseSectionHeaderLine(line *SectionHeaderLine) error {
 	return nil
 }
 
+// advanceLine advances the parser to the next line
+//
+// The line is linked up to the previous line if it exists to create a linked list
+// The new line is started as an `EmptyLine`` with a `WhitespaceNode`
 func (p *iniParser) advanceLine() {
 
 	// TODO: We should check if nodes on the line are properly terminated

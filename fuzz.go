@@ -4,6 +4,15 @@ import (
 	"math/rand"
 )
 
+// fuzzFromSet creates a number of fuzzy bytes from the set
+func fuzzFromSet(set []byte) (result []byte) {
+	n := rand.Intn(100)
+	for i := 0; i < n; i++ {
+		result = append(result, fuzzyChoice(set))
+	}
+	return
+}
+
 // fuzzyChoice returns a randomly chosen byte from the input
 func fuzzyChoice(choices []byte) byte {
 	return choices[rand.Intn(len(choices))]

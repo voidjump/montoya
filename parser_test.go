@@ -2,13 +2,12 @@ package montoya
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// TODO: Test errors
 
 // testParse runs Parse with the input byte string, constructing a reader from it
 func testParse(input ...any) (*IniFile, error) {
@@ -39,6 +38,17 @@ func TestParseEmptyFile(t *testing.T) {
 	line := file.Head
 
 	assert.Nil(t, line)
+}
+
+// Test the parser errors are formatted correctly
+func TestParseErrFormat(t *testing.T) {
+	p := iniParser{
+		lineNo: 42,
+		colNo: 80,
+	}
+	err := p.Err("test error")
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "test error (line:42, col:80)")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -165,6 +175,18 @@ func TestParseEmptyLineOnlyASingleComment(t *testing.T) {
 	assert.Equal(t, []byte(comment)[1:], concrete.Comment.content)
 }
 
+// Test illegal key byte on an empty line creates an error
+func TestIllegalKeyByteOnEmptyLineIsError(t *testing.T) {
+	lineError := fuzzFromSet(invalidKeyByteSet)
+	file, err := testParse(lineError, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+
+	assert.ErrorContains(t, err, fmt.Sprintf("invalid character %02x for empty line", lineError[0]))
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // SECTION LINE CASES //////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -289,8 +311,43 @@ func TestParseSimpleSectionWithWhitespaceAndComment(t *testing.T) {
 
 // Test a comment-ed out section does not yield a SectionHeaderLine
 func TestCommentedSectionYieldsEmptyLine(t *testing.T) {
+	commentByte := fuzzyChoice(commentStartBytes)
+	section := fuzzSection(false)
+	file, err := testParse(commentByte, B_BRACKET, section, B_BRACKETCLOSE, B_NEWLINE)
 
+	assert.NoError(t, err)
+	assert.NotNil(t, file)
+
+	line := file.Head
+
+	assert.NotNil(t, line)
+
+	assert.IsType(t, &EmptyLine{}, line)
 }
+
+// Test a comment in a section is not allowed
+func TestCommentInHeaderNotAllowed(t *testing.T) {
+	section := fuzzSection(false)
+	comment := fuzzComment()
+	file, err := testParse(B_BRACKET, section, comment, B_BRACKETCLOSE, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, "illegal comment start in bracket")
+}
+
+// Test non-whitespace after a section and before comment is not allowed
+func TestNonWhitespaceAfterHeaderNotAllowed(t *testing.T) {
+	section := fuzzSection(false)
+	comment := fuzzComment()
+	illegalByte := fuzzyChoice(invalidWhitespaceByteset)
+	file, err := testParse(B_BRACKET, section, B_BRACKETCLOSE, illegalByte, comment, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, fmt.Sprintf("illegal non-comment character %02x after closed section header", illegalByte))
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // KEY VALUE LINE CASES ////////////////////////////////////////////////////////
@@ -486,4 +543,87 @@ func TestQuotedValue(t *testing.T) {
 	assert.Equal(t, value, concrete.Value.content)
 	assert.Equal(t, comment[1:], concrete.Comment.content)
 	assert.Equal(t, comment[0], concrete.Comment.symbol)
+}
+
+// Test an invalid key byte in a key returns an error
+func TestInvalidKeyByteInKeyIsError(t *testing.T) {
+	key := fuzzKey()
+	invalidByte := fuzzyChoice(invalidKeyByteSet)
+	value := fuzzValue(false)
+	file, err := testParse(key, invalidByte, B_EQUALS, value, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, fmt.Sprintf("invalid character %02x in key", invalidByte))
+}
+
+// Test a non-whitespace byte after a key returns an error
+func TestNonWhiteSpaceAfterKeyRaisesError(t *testing.T) {
+	key := fuzzKey()
+	whiteSpace := fuzzWhiteSpace(10)
+	invalidByte := fuzzyChoice(invalidWhitespaceByteset)
+	value := fuzzValue(false)
+	file, err := testParse(key, whiteSpace, invalidByte, B_EQUALS, value, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, fmt.Sprintf("invalid non-whitespace character %02x in key", invalidByte))
+}
+
+// Test a quote inside an unquoted string is illegal
+func TestExtraValueQuoteErrorInUnquotedString(t *testing.T) {
+	key := fuzzKey()
+	value := fuzzValue(false) // value without quotes
+	file, err := testParse(key, B_EQUALS, value, B_QUOTE, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, "illegal quote character in value")
+}
+
+// Test a quote after a terminated quoted string is illegal
+func TestExtraValueQuoteErrorAfterTerminatedQuoted(t *testing.T) {
+	key := fuzzKey()
+	value := fuzzValue(true) // value with quotes
+	file, err := testParse(key, B_EQUALS, value, B_QUOTE, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, "illegal quote character in value")
+}
+
+// Test a non-whitespace character after a terminated quoted string is illegal
+func TestNonWhitespaceAfterTerminatedValueIllegal(t *testing.T) {
+	key := fuzzKey()
+	value := fuzzValue(true) // value with quotes
+	illegalByte := fuzzyChoice(invalidWhitespaceByteset)
+	file, err := testParse(key, B_EQUALS, value, illegalByte, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, fmt.Sprintf("illegal character %02x after terminated quoted value", illegalByte))
+}
+
+// Test a Null Byte inside an unquoted value is illegal
+func TestNullByteInUnquotedValueIllegal(t *testing.T) {
+	key := fuzzKey()
+	value := fuzzValue(false) // value without quotes
+	illegalByte := B_NULL 
+	file, err := testParse(key, B_EQUALS, value, illegalByte, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, fmt.Sprintf("illegal character %02x in value", illegalByte))
+}
+
+// Test a Null Byte inside a quoted value is illegal
+func TestNullByteInRuotedValueIllegal(t *testing.T) {
+	key := fuzzKey()
+	value := fuzzValue(false) // value without quotes, we add them manually
+	illegalByte := B_NULL 
+	file, err := testParse(key, B_EQUALS, B_QUOTE, value, illegalByte, B_QUOTE, B_NEWLINE)
+
+	assert.Error(t, err)
+	assert.Nil(t, file)
+	assert.ErrorContains(t, err, fmt.Sprintf("illegal character %02x in value", illegalByte))
 }

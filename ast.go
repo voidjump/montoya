@@ -21,24 +21,31 @@ type IniNode interface {
 	Content() []byte
 }
 
+// LineBase is the base struct for iniLines and forms a node in a doubly linked list
 type LineBase struct {
+	// ReadBuf is a buffer populated when the line is being read
 	ReadBuf []byte
+	// reader contains the reader state when the line is being read
 	reader  io.Reader
 
+	// prev is a link to the previous iniLine
 	prev IniLine
+	// next is a link to the next iniLine
 	next IniLine
 }
 
-// Reset reader state
+// Reset resets reader state
 func (l *LineBase) Reset() {
 	l.ReadBuf = []byte{}
 	l.reader = nil
 }
 
+// HasReader returns whether the line is currently being read
 func (l *LineBase) HasReader() bool {
 	return l.reader != nil
 }
 
+// Read implements io.Reader for `LineBase`
 func (l *LineBase) Read(p []byte) (n int, err error) {
 	if l.reader == nil {
 		l.reader = bytes.NewReader(l.ReadBuf)
@@ -46,63 +53,83 @@ func (l *LineBase) Read(p []byte) (n int, err error) {
 	return l.reader.Read(p)
 }
 
+// Next returns the next IniLine
 func (l *LineBase) Next() IniLine {
 	return l.next
 }
 
+// Previous returns the previous IniLine
 func (l *LineBase) Previous() IniLine {
 	return l.prev
 }
 
+// SetPrev sets the previous IniLine node
 func (l *LineBase) SetPrev(node IniLine) {
 	l.prev = node
 }
 
+// SetNext sets the next InitLine node
 func (l *LineBase) SetNext(node IniLine) {
 	l.next = node
 }
 
+// WhitespaceNode is whitespace in an IniLine
 type WhitespaceNode struct {
 	content []byte
 }
 
+// Content returns the node's content
 func (w *WhitespaceNode) Content() []byte {
 	return w.content
 }
 
+// CommentNode is a comment in an IniLine
 type CommentNode struct {
+	// symbol is the symbol indicating the comment from  `commentStartBytes`
 	symbol  byte
+	// content contains the comment content, without the comment start symbol
 	content []byte
 }
 
+// Content returns the node's content
 func (w *CommentNode) Content() []byte {
 	return w.content
 }
 
+// HeaderNode is a header in an IniLine denoting a section
 type HeaderNode struct {
+	// content contains the header name, without brackets
 	content []byte
 }
 
+// Content returns the node's content
 func (w *HeaderNode) Content() []byte {
 	return w.content
 }
 
+// KeyNode contains a key in a KeyValueLine
 type KeyNode struct {
+	// content contains the key content
 	content []byte
 }
 
+// Content returns the node's content
 func (w *KeyNode) Content() []byte {
 	return w.content
 }
 
+// ValueNode is a Value inside a KeyValueLine
 type ValueNode struct {
+	// content contains the value
 	content []byte
 }
 
+// Content returns the node's content
 func (w ValueNode) Content() []byte {
 	return w.content
 }
 
+// EmptyLine is an iniLine containing an optional comment
 type EmptyLine struct {
 	LineBase
 
@@ -110,6 +137,7 @@ type EmptyLine struct {
 	Comment *CommentNode
 }
 
+// Read implements io.Reader for `EmptyLine`
 func (l *EmptyLine) Read(p []byte) (n int, err error) {
 	if !l.HasReader() {
 		// Populate buffer
@@ -119,6 +147,7 @@ func (l *EmptyLine) Read(p []byte) (n int, err error) {
 	return l.LineBase.Read(p)
 }
 
+// Section is an iniLine containing a section header and optional comment
 type SectionHeaderLine struct {
 	LineBase
 
@@ -128,6 +157,7 @@ type SectionHeaderLine struct {
 	Comment *CommentNode
 }
 
+// Read implements io.Reader for `SectionHeaderLine`
 func (l *SectionHeaderLine) Read(p []byte) (n int, err error) {
 	if !l.HasReader() {
 		// Populate buffer
@@ -139,6 +169,7 @@ func (l *SectionHeaderLine) Read(p []byte) (n int, err error) {
 	return l.LineBase.Read(p)
 }
 
+// KeyValueLine is an iniLine containing a key, value and optional comment
 type KeyValueLine struct {
 	LineBase
 
@@ -149,6 +180,7 @@ type KeyValueLine struct {
 	Comment    *CommentNode
 }
 
+// Read implements io.Reader for `KeyValueLine`
 func (l *KeyValueLine) Read(p []byte) (n int, err error) {
 	if !l.HasReader() {
 		// Populate buffer
@@ -179,24 +211,14 @@ func isClosedQuotedString(content []byte) bool {
 	return state == VALUE_PARSE_QUOTED_TERMINATED
 }
 
-// Check if all of content is whitespace
-func allWhiteSpace(content []byte) bool {
-	for _, b := range content {
-		if TokenType(b) != Whitespace {
-			return false
-		}
-	}
-	return true
-}
+const VALUE_PARSE_WHITESPACE = 1 // The value consists entirely of whitespace
+const VALUE_PARSE_QUOTED = 2 // The value is an open, quoted string
+const VALUE_PARSE_QUOTED_BACKSLASH = 3 // The value is an open, quoted string and the last byte is an escape backslash
+const VALUE_PARSE_QUOTED_TERMINATED = 4 // The Value is a terminated quoted string
+const VALUE_PARSE_UNQUOTED = 9 // The value is an unquoted string
+const VALUE_PARSE_ERROR = 10 // The value contains illegal bytes
 
-const VALUE_PARSE_WHITESPACE = 1
-const VALUE_PARSE_QUOTED = 2
-const VALUE_PARSE_QUOTED_BACKSLASH = 3
-const VALUE_PARSE_QUOTED_TERMINATED = 4
-const VALUE_PARSE_UNQUOTED = 9
-const VALUE_PARSE_ERROR = 10
-
-// Use a state machine to determine the state of the currently parsed value string
+// valuestringState uses a state machine to determine the state of the currently parsed value string
 func valueStringState(content []byte) (state int) {
 	state = VALUE_PARSE_WHITESPACE
 	for _, token := range content {

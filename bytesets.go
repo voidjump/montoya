@@ -27,7 +27,7 @@ var validWhitespaceByteSet = []byte{
 	B_CR,
 }
 
-// var invalidWhitespaceByteset = invertByteSet(validWhitespaceByteSet)
+var invalidWhitespaceByteset = invertByteSet(validWhitespaceByteSet)
 
 // Sections may not contain nulls, newlines, brackets, or comment start symbols
 var invalidSectionByteSet = []byte{
