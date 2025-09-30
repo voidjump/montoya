@@ -33,7 +33,7 @@ type LineBase struct {
 	// ReadBuf is a buffer populated when the line is being read
 	ReadBuf []byte
 	// reader contains the reader state when the line is being read
-	reader  io.Reader
+	reader io.Reader
 
 	// prev is a link to the previous iniLine
 	prev IniLine
@@ -93,7 +93,7 @@ func (w *WhitespaceNode) Content() []byte {
 // CommentNode is a comment in an IniLine
 type CommentNode struct {
 	// symbol is the symbol indicating the comment from  `commentStartBytes`
-	symbol  byte
+	symbol byte
 	// content contains the comment content, without the comment start symbol
 	content []byte
 }
@@ -181,7 +181,7 @@ func (l *SectionHeaderLine) Read(p []byte) (n int, err error) {
 	return l.LineBase.Read(p)
 }
 
-// Terminated indicates whether a SectionHeaderLine was properly terminated 
+// Terminated indicates whether a SectionHeaderLine was properly terminated
 func (l *SectionHeaderLine) Terminated() bool {
 	// the parser adds a PostPad node when the section header terminates
 	return l.PostPad != nil
@@ -212,15 +212,15 @@ func (l *KeyValueLine) Read(p []byte) (n int, err error) {
 	return l.LineBase.Read(p)
 }
 
-// Terminated indicates whether a KeyValueLine was properly terminated 
+// Terminated indicates whether a KeyValueLine was properly terminated
 func (l *KeyValueLine) Terminated() bool {
 	if l.Value == nil {
 		// parser never saw B_EQUALS
 		return false
-	}	
+	}
 
-	state := valueStringState(l.Value.content) 
-	return (state == VALUE_PARSE_WHITESPACE || state ==  VALUE_PARSE_QUOTED_TERMINATED || state == VALUE_PARSE_UNQUOTED)
+	state := valueStringState(l.Value.content)
+	return (state == VALUE_PARSE_WHITESPACE || state == VALUE_PARSE_QUOTED_TERMINATED || state == VALUE_PARSE_UNQUOTED)
 }
 
 // isKeyByte checks if the input may be present in a Key
@@ -240,12 +240,12 @@ func isClosedQuotedString(content []byte) bool {
 	return state == VALUE_PARSE_QUOTED_TERMINATED
 }
 
-const VALUE_PARSE_WHITESPACE = 1 // The value consists entirely of whitespace
-const VALUE_PARSE_QUOTED = 2 // The value is an open, quoted string
-const VALUE_PARSE_QUOTED_BACKSLASH = 3 // The value is an open, quoted string and the last byte is an escape backslash
+const VALUE_PARSE_WHITESPACE = 1        // The value consists entirely of whitespace
+const VALUE_PARSE_QUOTED = 2            // The value is an open, quoted string
+const VALUE_PARSE_QUOTED_BACKSLASH = 3  // The value is an open, quoted string and the last byte is an escape backslash
 const VALUE_PARSE_QUOTED_TERMINATED = 4 // The Value is a terminated quoted string
-const VALUE_PARSE_UNQUOTED = 9 // The value is an unquoted string
-const VALUE_PARSE_ERROR = 10 // The value contains illegal bytes
+const VALUE_PARSE_UNQUOTED = 9          // The value is an unquoted string
+const VALUE_PARSE_ERROR = 10            // The value contains illegal bytes
 
 // valuestringState uses a state machine to determine the state of the currently parsed value string
 func valueStringState(content []byte) (state int) {

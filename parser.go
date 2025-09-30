@@ -242,11 +242,11 @@ func (p *iniParser) parseSectionHeaderLine(line *SectionHeaderLine) error {
 // advanceLine advances the parser to the next line
 //
 // The line is linked up to the previous line if it exists to create a linked list
-// The new line is started as an `EmptyLine`` with a `WhitespaceNode`
+// The new line is started as an `EmptyLine“ with a `WhitespaceNode`
 func (p *iniParser) advanceLine() error {
-	
+
 	if p.currentLine == nil {
-		return errors.New("parser cannot advance on a non-nil line") 
+		return errors.New("parser cannot advance on a non-nil line")
 	}
 	if !p.currentLine.Terminated() {
 		return errors.New("the current line was not properly terminated")

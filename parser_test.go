@@ -47,7 +47,7 @@ func TestParseEmptyFile(t *testing.T) {
 func TestParseErrFormat(t *testing.T) {
 	p := iniParser{
 		lineNo: 42,
-		colNo: 80,
+		colNo:  80,
 	}
 	err := p.Err("test error")
 	assert.Error(t, err)
@@ -188,7 +188,6 @@ func TestIllegalKeyByteOnEmptyLineIsError(t *testing.T) {
 
 	assert.ErrorContains(t, err, fmt.Sprintf("invalid character %02x for empty line", lineError[0]))
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // SECTION LINE CASES //////////////////////////////////////////////////////////
@@ -350,7 +349,6 @@ func TestNonWhitespaceAfterHeaderNotAllowed(t *testing.T) {
 	assert.Nil(t, file)
 	assert.ErrorContains(t, err, fmt.Sprintf("illegal non-comment character %02x after closed section header", illegalByte))
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // KEY VALUE LINE CASES ////////////////////////////////////////////////////////
@@ -611,7 +609,7 @@ func TestNonWhitespaceAfterTerminatedValueIllegal(t *testing.T) {
 func TestNullByteInUnquotedValueIllegal(t *testing.T) {
 	key := fuzzKey()
 	value := fuzzValue(false) // value without quotes
-	illegalByte := B_NULL 
+	illegalByte := B_NULL
 	file, err := testParse(key, B_EQUALS, value, illegalByte, B_NEWLINE)
 
 	assert.Error(t, err)
@@ -623,7 +621,7 @@ func TestNullByteInUnquotedValueIllegal(t *testing.T) {
 func TestNullByteInRuotedValueIllegal(t *testing.T) {
 	key := fuzzKey()
 	value := fuzzValue(false) // value without quotes, we add them manually
-	illegalByte := B_NULL 
+	illegalByte := B_NULL
 	file, err := testParse(key, B_EQUALS, B_QUOTE, value, illegalByte, B_QUOTE, B_NEWLINE)
 
 	assert.Error(t, err)
